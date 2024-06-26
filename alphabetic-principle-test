@@ -1,0 +1,171 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Mic, ArrowRight, ArrowLeft } from 'lucide-react';
+import { ReactMic } from 'react-mic';
+import { Howl } from 'howler';
+
+const alphabetOrder = ['p', 'g', 'a', 'c', 'b', 'm', 'v', 'x', 's', 'd', 'i', 'o', 'n', 't', 'z', 'w', 'l', 'k', 'y', 'e', 'r', 'h', 'f', 'u', 'j', 'q'];
+
+const AlphabeticPrincipleTest = () => {
+  const [currentLetterIndex, setCurrentLetterIndex] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [results, setResults] = useState([]);
+  const [isComplete, setIsComplete] = useState(false);
+  const [currentTest, setCurrentTest] = useState('name'); // 'name' or 'sound'
+  const [progress, setProgress] = useState(0);
+
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    setProgress((currentLetterIndex / alphabetOrder.length) * 100);
+    if (currentLetterIndex >= alphabetOrder.length) {
+      setIsComplete(true);
+    }
+
+    const handleKeyPress = (event) => {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        toggleRecording();
+      } else if (event.code === 'ArrowRight') {
+        handleNext();
+      } else if (event.code === 'ArrowLeft') {
+        handlePrevious();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentLetterIndex, isRecording]);
+
+  const toggleRecording = () => {
+    setIsRecording(!isRecording);
+    if (isRecording) {
+      setTimeout(() => setIsRecording(false), 5000); // Stop recording after 5 seconds
+    }
+  };
+
+  const onData = (recordedBlob) => {
+    console.log('chunk of real-time data is: ', recordedBlob);
+  };
+
+  const onStop = (recordedBlob) => {
+    console.log('recordedBlob is: ', recordedBlob);
+    // Here you would normally send this blob to your server for processing
+    // For now, we'll simulate a response
+    const isCorrect = Math.random() > 0.2;
+    setResults(prev => [...prev, {
+      letter: alphabetOrder[currentLetterIndex],
+      test: currentTest,
+      correct: isCorrect,
+      response: isCorrect ? 'Correct' : 'Incorrect'
+    }]);
+    
+    // Simulate playback of the recorded audio
+    const sound = new Howl({
+      src: [recordedBlob.blobURL],
+      format: ['webm']
+    });
+    sound.play();
+  };
+
+  const handleNext = () => {
+    if (currentTest === 'name') {
+      setCurrentTest('sound');
+    } else {
+      setCurrentTest('name');
+      if (currentLetterIndex < alphabetOrder.length - 1) {
+        setCurrentLetterIndex(prev => prev + 1);
+      } else {
+        setIsComplete(true);
+      }
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentTest === 'sound') {
+      setCurrentTest('name');
+    } else {
+      setCurrentTest('sound');
+      if (currentLetterIndex > 0) {
+        setCurrentLetterIndex(prev => prev - 1);
+      }
+    }
+  };
+
+  const resetTest = () => {
+    setCurrentLetterIndex(0);
+    setResults([]);
+    setIsComplete(false);
+    setCurrentTest('name');
+    setProgress(0);
+  };
+
+  if (isComplete) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto mt-10 p-6">
+        <CardContent>
+          <h2 className="text-2xl font-bold mb-4">Test Results</h2>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Letter</TableHead>
+                <TableHead>Test Type</TableHead>
+                <TableHead>Response</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {results.map((result, index) => (
+                <TableRow key={index}>
+                  <TableCell>{result.letter}</TableCell>
+                  <TableCell>{result.test}</TableCell>
+                  <TableCell>{result.response}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <Button onClick={resetTest} className="mt-4">Start Over</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="w-96 mx-auto mt-10 p-6">
+      <CardContent className="text-center">
+        <h2 className="text-6xl font-bold mb-4">{alphabetOrder[currentLetterIndex]}</h2>
+        <p className="mb-4">
+          {currentTest === 'name' ? "Name this letter" : "Make the sound for this letter"}
+        </p>
+        <ReactMic
+          record={isRecording}
+          className="sound-wave"
+          onStop={onStop}
+          onData={onData}
+          strokeColor="#000000"
+          backgroundColor="#FF4081"
+        />
+        <Button 
+          onClick={toggleRecording}
+          className="mb-4 flex items-center"
+        >
+          <Mic className="mr-2" />
+          {isRecording ? "Recording... (Press Space)" : "Start Recording (Press Space)"}
+        </Button>
+        <div className="flex justify-between mb-4">
+          <Button onClick={handlePrevious} disabled={currentLetterIndex === 0 && currentTest === 'name'}>
+            <ArrowLeft className="mr-2" /> Previous
+          </Button>
+          <Button onClick={handleNext}>
+            Next <ArrowRight className="ml-2" />
+          </Button>
+        </div>
+        <Progress value={progress} className="w-full" />
+      </CardContent>
+    </Card>
+  );
+};
+
+export default AlphabeticPrincipleTest;
